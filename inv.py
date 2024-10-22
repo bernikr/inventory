@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import base64
 import os
 import uuid
@@ -156,7 +157,7 @@ def hoists_search(root: Item, bfs: bool = True) -> list[Item]:
         e = q.popleft() if bfs else q.pop()
         if e.hoisted:
             res.append(e)
-        q.extend(e.children)
+        q.extend(e.children if bfs else reversed(e.children))
     return res
 
 
@@ -170,7 +171,7 @@ def save_inventory_file(file: str, root: Item):
                 render_item(f, i)
 
 
-def collect_uuids(root: Item):
+def collect_uuids(root: Item) -> dict[uuid.UUID, Item]:
     def _coll(i: Item, d: dict[uuid.UUID, Item]):
         if i.uuid:
             d[i.uuid] = i
@@ -182,11 +183,60 @@ def collect_uuids(root: Item):
     return res
 
 
+def search_uuid(s: str, tree: Item) -> Item:
+    candidates = [
+        item for id, item in collect_uuids(tree).items() if str(id).startswith(s)
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+    raise ValueError(f"{len(candidates)} uuids starting with '{s}' found")
+
+
+def hoist(args, tree: Item) -> bool:
+    i = search_uuid(args.uuid, tree)
+    i.hoisted = True
+    return True
+
+
+def unhoist(args, tree: Item) -> bool:
+    i = search_uuid(args.uuid, tree)
+    i.hoisted = False
+    return True
+
+
+def move(args, tree: Item) -> bool:
+    item = search_uuid(args.item, tree)
+    into = search_uuid(args.into, tree)
+    into.children.append(item)
+    item.parent.children.remove(item)
+    update_parents(tree)
+    return True
+
+
 if __name__ == "__main__":
     load_dotenv()
     INVENTORY_FILE = os.environ["INVENTORY_FILE"]
 
+    p = argparse.ArgumentParser()
+    sps = p.add_subparsers()
+
+    format_p = sps.add_parser("format")
+    format_p.set_defaults(func=lambda *a, **b: True)
+
+    hoist_p = sps.add_parser("hoist")
+    hoist_p.add_argument("uuid")
+    hoist_p.set_defaults(func=hoist)
+
+    unhoist_p = sps.add_parser("unhoist")
+    unhoist_p.add_argument("uuid")
+    unhoist_p.set_defaults(func=unhoist)
+
+    move_p = sps.add_parser("move")
+    move_p.add_argument("item")
+    move_p.add_argument("into")
+    move_p.set_defaults(func=move)
+
+    args = p.parse_args()
     tree = parse_inventory_file(INVENTORY_FILE)
-    print_tree(tree)
-    uuids = collect_uuids(tree)
-    save_inventory_file(INVENTORY_FILE, tree)
+    if args.func(args, tree):
+        save_inventory_file(INVENTORY_FILE, tree)
