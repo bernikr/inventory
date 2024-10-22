@@ -38,6 +38,12 @@ class HoistLinkLinkExtension(Extension):
         )
 
 
+def update_parents(i: Item):
+    for c in i.children:
+        c.parent = i
+        update_parents(c)
+
+
 def parse_inventory_file(file: str) -> Item:
     with open(file, "r", encoding="utf-8") as f:
         inp = f.read()
@@ -58,6 +64,7 @@ def parse_inventory_file(file: str) -> Item:
                 cur_root = hoists[e.text]
             case _:
                 raise NotImplementedError(f"Unknown first level child: {type(e)}: {e}")
+    update_parents(root)
     return root
 
 
@@ -163,10 +170,23 @@ def save_inventory_file(file: str, root: Item):
                 render_item(f, i)
 
 
+def collect_uuids(root: Item):
+    def _coll(i: Item, d: dict[uuid.UUID, Item]):
+        if i.uuid:
+            d[i.uuid] = i
+        for c in i.children:
+            _coll(c, d)
+
+    res = {}
+    _coll(root, res)
+    return res
+
+
 if __name__ == "__main__":
     load_dotenv()
     INVENTORY_FILE = os.environ["INVENTORY_FILE"]
 
     tree = parse_inventory_file(INVENTORY_FILE)
     print_tree(tree)
+    uuids = collect_uuids(tree)
     save_inventory_file(INVENTORY_FILE, tree)
