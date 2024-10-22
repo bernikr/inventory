@@ -6,6 +6,7 @@ import os
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
+from importlib.resources import contents
 from xml.etree.ElementTree import Element
 
 import markdown
@@ -78,7 +79,7 @@ def parse_uuid(ref: str) -> uuid.UUID:
     elif len(ref) == 22:
         return uuid.UUID(bytes=base64.urlsafe_b64decode(ref + "=="))
     else:
-        raise NotImplementedError(f"Invalid UUID: {ref}")
+        raise ValueError(f"Invalid UUID: {ref}")
 
 
 def parse_list_item(li: Tag, hoists: dict[str, Item]) -> Item:
@@ -149,64 +150,62 @@ def render_item(f, i: Item, depth=0):
             render_item(f, c, depth + 1)
 
 
-def hoists_search(root: Item, bfs: bool = True) -> list[Item]:
-    q: deque[Item] = deque()
-    q.append(root)
-    res = []
-    while q:
-        e = q.popleft() if bfs else q.pop()
-        if e.hoisted:
-            res.append(e)
-        q.extend(e.children if bfs else reversed(e.children))
-    return res
-
-
 def save_inventory_file(file: str, root: Item):
     with open(file, "w", encoding="utf-8") as f:
         for i in root.children:
             render_item(f, i)
-        for h in hoists_search(root):
+        for h in (h for h in flatten(root) if h.hoisted):
             f.write(f"\n# {h.name}\n")
             for i in h.children:
                 render_item(f, i)
 
 
-def collect_uuids(root: Item) -> dict[uuid.UUID, Item]:
-    def _coll(i: Item, d: dict[uuid.UUID, Item]):
-        if i.uuid:
-            d[i.uuid] = i
-        for c in i.children:
-            _coll(c, d)
-
-    res = {}
-    _coll(root, res)
+def flatten(tree: Item, depth_first: bool = False) -> list[Item]:
+    q: deque[Item] = deque()
+    q.append(tree)
+    res = []
+    while q:
+        e = q.pop() if depth_first else q.popleft()
+        res.append(e)
+        q.extend(reversed(e.children) if depth_first else e.children)
     return res
 
 
-def search_uuid(s: str, tree: Item) -> Item:
-    candidates = [
-        item for id, item in collect_uuids(tree).items() if str(id).startswith(s)
-    ]
-    if len(candidates) == 1:
-        return candidates[0]
-    raise ValueError(f"{len(candidates)} uuids starting with '{s}' found")
+def search_item(s: str, tree: Item) -> Item:
+    try:
+        id = parse_uuid(s)
+        return next(i for i in flatten(tree) if i.uuid == id)
+    except ValueError:
+        pass
+
+    uuid_candidates = [i for i in flatten(tree) if str(i.uuid).startswith(s.lower())]
+    if len(uuid_candidates) == 1:
+        return uuid_candidates[0]
+
+    name_candidates = [i for i in flatten(tree) if i.name.lower().startswith(s.lower())]
+    if len(name_candidates) == 1 and len(s) > 4:
+        return name_candidates[0]
+
+    raise ValueError(
+        f"{len(uuid_candidates)} uuids and {len(name_candidates)} names starting with '{s}' found"
+    )
 
 
 def hoist(args, tree: Item) -> bool:
-    i = search_uuid(args.uuid, tree)
+    i = search_item(args.item, tree)
     i.hoisted = True
     return True
 
 
 def unhoist(args, tree: Item) -> bool:
-    i = search_uuid(args.uuid, tree)
+    i = search_item(args.item, tree)
     i.hoisted = False
     return True
 
 
 def move(args, tree: Item) -> bool:
-    item = search_uuid(args.item, tree)
-    into = search_uuid(args.into, tree)
+    item = search_item(args.item, tree)
+    into = search_item(args.into, tree)
     into.children.append(item)
     item.parent.children.remove(item)
     update_parents(tree)
@@ -224,11 +223,11 @@ if __name__ == "__main__":
     format_p.set_defaults(func=lambda *a, **b: True)
 
     hoist_p = sps.add_parser("hoist")
-    hoist_p.add_argument("uuid")
+    hoist_p.add_argument("item")
     hoist_p.set_defaults(func=hoist)
 
     unhoist_p = sps.add_parser("unhoist")
-    unhoist_p.add_argument("uuid")
+    unhoist_p.add_argument("item")
     unhoist_p.set_defaults(func=unhoist)
 
     move_p = sps.add_parser("move")
