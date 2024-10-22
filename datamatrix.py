@@ -3,14 +3,13 @@ import csv
 import uuid
 from pathlib import Path
 
-from ppf.datamatrix import DataMatrix
 from PIL import Image, ImageDraw
+from ppf.datamatrix import DataMatrix
 
 PIXEL_SIZE = 40
 BORDER = 1
 AMOUNT = 64
 OUTPUT_FOLDER = Path(__file__).parent / "codes"
-
 
 
 if __name__ == "__main__":
@@ -23,8 +22,9 @@ if __name__ == "__main__":
         w.writerow(["file", "uuid", "uuid_b64", "hash"])
         for _ in range(AMOUNT):
             uuid_obj = uuid.uuid4()
-            uuid_b64 = base64.urlsafe_b64encode(uuid_obj.bytes).decode().replace("=", "")
-            # uuid.UUID(bytes=base64.urlsafe_b64decode(s + "=="))
+            uuid_b64 = (
+                base64.urlsafe_b64encode(uuid_obj.bytes).decode().replace("=", "")
+            )
 
             dm = DataMatrix(uuid_b64)
 
@@ -36,7 +36,10 @@ if __name__ == "__main__":
 
             d = ImageDraw.Draw(img)
             for x, y in (
-                (x, y) for y, line in enumerate(dm.matrix) for x, c in enumerate(line) if c
+                (x, y)
+                for y, line in enumerate(dm.matrix)
+                for x, c in enumerate(line)
+                if c
             ):
                 d.rectangle([t(x), t(y), t(x + 1) - 1, t(y + 1) - 1], fill=0)
 
