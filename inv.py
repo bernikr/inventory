@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from xml.etree.ElementTree import Element
 
@@ -123,9 +124,46 @@ def print_tree(tree: Item, level=0):
         print_tree(e, level + 1)
 
 
+def render_item(f, i: Item, depth=0):
+    f.write("\t" * depth + "- ")
+    if i.hoisted:
+        f.write(f"[[#{i.name}]]")
+    else:
+        f.write(i.name)
+    if i.uuid:
+        f.write(f" [](uuid:{i.uuid})")
+    f.write("\n")
+    if not i.hoisted:
+        for c in i.children:
+            render_item(f, c, depth + 1)
+
+
+def hoists_search(root: Item, bfs: bool = True) -> list[Item]:
+    q: deque[Item] = deque()
+    q.append(root)
+    res = []
+    while q:
+        e = q.popleft() if bfs else q.pop()
+        if e.hoisted:
+            res.append(e)
+        q.extend(e.children)
+    return res
+
+
+def save_inventory_file(file: str, root: Item):
+    with open(file, "w", encoding="utf-8") as f:
+        for i in root.children:
+            render_item(f, i)
+        for h in hoists_search(root):
+            f.write(f"\n# {h.name}\n")
+            for i in h.children:
+                render_item(f, i)
+
+
 if __name__ == "__main__":
     load_dotenv()
     INVENTORY_FILE = os.environ["INVENTORY_FILE"]
 
     tree = parse_inventory_file(INVENTORY_FILE)
     print_tree(tree)
+    save_inventory_file(INVENTORY_FILE, tree)
