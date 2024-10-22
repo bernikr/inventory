@@ -5,8 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "beautifulsoup4>=4.12.3",
+    "markdown>=3.7",
     "pillow>=11.0.0",
     "ppf-datamatrix>=0.2",
+    "python-dotenv>=1.0.1",
+    "uuid>=1.30",
 ]
 
 [tool.uv]
