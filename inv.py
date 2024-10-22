@@ -6,7 +6,6 @@ import os
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
-from importlib.resources import contents
 from xml.etree.ElementTree import Element
 
 import markdown
@@ -203,6 +202,14 @@ def unhoist(args, tree: Item) -> bool:
     return True
 
 
+def find(args, tree: Item) -> bool:
+    i = search_item(args.item, tree)  # todo fuzzy search
+    while i:
+        print(i.name)
+        i = i.parent
+    return False
+
+
 def move(args, tree: Item) -> bool:
     item = search_item(args.item, tree)
     into = search_item(args.into, tree)
@@ -234,6 +241,10 @@ if __name__ == "__main__":
     move_p.add_argument("item")
     move_p.add_argument("into")
     move_p.set_defaults(func=move)
+
+    find_p = sps.add_parser("find")
+    find_p.add_argument("item")
+    find_p.set_defaults(func=find)
 
     args = p.parse_args()
     tree = parse_inventory_file(INVENTORY_FILE)
