@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import os
 import uuid
 from collections import deque
@@ -66,6 +67,8 @@ def parse_uuid(ref: str) -> uuid.UUID:
 
     if len(ref) == 36:
         return uuid.UUID(ref)
+    elif len(ref) == 22:
+        return uuid.UUID(bytes=base64.urlsafe_b64decode(ref + "=="))
     else:
         raise NotImplementedError(f"Invalid UUID: {ref}")
 
