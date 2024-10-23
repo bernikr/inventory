@@ -15,7 +15,10 @@ class Item:
     hoisted: bool = False
 
 
-def parse_uuid(ref: str) -> uuid.UUID:
+def parse_uuid(ref: str | uuid.UUID) -> uuid.UUID:
+    if isinstance(ref, uuid.UUID):
+        return ref
+
     if ref.startswith("uuid:"):
         ref = ref[5:]
 
