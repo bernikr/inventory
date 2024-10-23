@@ -36,9 +36,16 @@ def search_item(s: str | uuid.UUID, tree: Item, uuid_only=False) -> Item:
 
 
 class CliMode(Enum):
+    ADD = "add"
+    CHECKOUT = "checkout"
     NEW_UUID = "new uuid"
     DEFAULT = ""
     MOVE = "move"
+
+
+def move(item: Item, into: Item):
+    into.children.append(item)
+    item.parent.children.remove(item)
 
 
 class InventoryCli(cmd.Cmd):
@@ -75,6 +82,9 @@ class InventoryCli(cmd.Cmd):
                 return
             self.selected_item.uuid = uid
             self.mode = CliMode.DEFAULT
+            print(
+                f"Changed UUID of {self.selected_item.name} to {str(self.selected_item.uuid)[:8]}"
+            )
             return
 
         try:
@@ -87,9 +97,14 @@ class InventoryCli(cmd.Cmd):
             case CliMode.DEFAULT:
                 self.selected_item = item
             case CliMode.MOVE:
-                item.children.append(self.selected_item)
-                self.selected_item.parent.children.remove(self.selected_item)
+                move(self.selected_item, item)
+
                 self.mode = CliMode.DEFAULT
+                print(f"moved {self.selected_item.name} into {item.name}")
+            case CliMode.CHECKOUT:
+                self._checkout(item)
+            case CliMode.ADD:
+                move(item, self.selected_item)
             case _:
                 raise NotImplementedError(f"Unknown mode {self.mode}")
 
@@ -114,9 +129,6 @@ class InventoryCli(cmd.Cmd):
     def do_unhoist(self, _):
         self.selected_item.hoisted = False
 
-    def do_unselect(self, _):
-        self.selected_item = None
-
     def do_contents(self, _):
         i = self.selected_item if self.selected_item else self.tree
         print_tree(i)
@@ -129,14 +141,34 @@ class InventoryCli(cmd.Cmd):
                 locs.append(i)
                 i = i.parent
             for i, loc in enumerate(reversed(locs)):
-                print("  "*i + loc.name)
+                print("  " * i + loc.name)
         else:
             print("Select an item first")
 
-    @staticmethod
-    def do_exit(_):
-        return True
+    def _checkout(self, item: Item):
+        item.parent.children.remove(item)
+        self.tree.children.append(item)
+        print(f"checked out {item.name}")
 
+    def do_checkout(self, _):
+        if self.selected_item:
+            self._checkout(self.selected_item)
+        else:
+            self.mode = CliMode.CHECKOUT
+
+    def do_add(self, _):
+        if self.selected_item:
+            self.mode = CliMode.ADD
+        else:
+            print("Select an item first")
+
+    def do_exit(self, _):
+        if self.mode != CliMode.DEFAULT:
+            self.mode = CliMode.DEFAULT
+        elif self.selected_item:
+            self.selected_item = None
+        else:
+            return True
 
 
 if __name__ == "__main__":
