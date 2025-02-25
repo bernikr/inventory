@@ -90,8 +90,8 @@ class InventoryCli(cmd.Cmd):
 
         try:
             item = search_item(line, self.tree)
-        except ValueError:
-            print(f"Item not found: {line}")
+        except ValueError as e:
+            print(e)
             return
 
         match self.mode:
