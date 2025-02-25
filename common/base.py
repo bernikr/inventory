@@ -14,6 +14,9 @@ class Item:
     parent: Item | None = None
     hoisted: bool = False
 
+    def __repr__(self) -> str:
+        return f"{self.name}{f' ({str(self.uuid)[:8]})' if self.uuid is not None else ''}"
+
 
 def parse_uuid(ref: str | uuid.UUID) -> uuid.UUID:
     if isinstance(ref, uuid.UUID):
@@ -29,12 +32,8 @@ def parse_uuid(ref: str | uuid.UUID) -> uuid.UUID:
     raise ValueError(msg)
 
 
-def display_uuid(uuid: uuid.UUID | None) -> str:
-    return f" ({str(uuid)[:8]})" if uuid is not None else ""
-
-
 def print_tree(tree: Item, level: int = 0) -> None:
-    print(f"{'  ' * level}{'*' if tree.hoisted else ''}{tree.name}{display_uuid(tree.uuid)}")
+    print(f"{'  ' * level}{'*' if tree.hoisted else ''}{tree}")
     for e in tree.children:
         print_tree(e, level + 1)
 

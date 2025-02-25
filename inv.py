@@ -8,7 +8,7 @@ from typing import assert_never
 
 from dotenv import load_dotenv
 
-from common.base import Item, display_uuid, flatten, parse_uuid, print_tree, update_parents
+from common.base import Item, flatten, parse_uuid, print_tree, update_parents
 from common.parser import parse_inventory_file, save_inventory_file
 
 
@@ -69,12 +69,7 @@ class InventoryCli(cmd.Cmd):
         return line
 
     def postcmd(self, stop: bool, line: str) -> bool:  # noqa: ARG002, FBT001
-        selected_text = (
-            f"SELECTED: {self.selected_item.name}{display_uuid(self.selected_item.uuid)}\n"
-            if self.selected_item
-            else ""
-        )
-        self.prompt = f"{selected_text}{self.mode.value}> "
+        self.prompt = f"{f'SELECTED: {self.selected_item}\n' if self.selected_item else ''}{self.mode.value}> "
         update_parents(self.tree)
         save_inventory_file(self.file, self.tree)
         return stop
