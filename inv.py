@@ -44,9 +44,11 @@ class CliMode(Enum):
 
 
 def move(item: Item, into: Item) -> None:
+    if item.parent is None:
+        print("Cannot move root")
+        return
     into.children.append(item)
-    if item.parent is not None:
-        item.parent.children.remove(item)
+    item.parent.children.remove(item)
 
 
 class InventoryCli(cmd.Cmd):
