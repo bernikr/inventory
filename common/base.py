@@ -9,9 +9,9 @@ from dataclasses import dataclass, field
 @dataclass
 class Item:
     name: str
-    uuid: uuid.UUID = None
+    uuid: uuid.UUID | None = None
     children: list[Item] = field(default_factory=list)
-    parent: Item = None
+    parent: Item | None = None
     hoisted: bool = False
 
 
@@ -19,26 +19,27 @@ def parse_uuid(ref: str | uuid.UUID) -> uuid.UUID:
     if isinstance(ref, uuid.UUID):
         return ref
 
-    if ref.startswith("uuid:"):
-        ref = ref[5:]
+    ref = ref.removeprefix("uuid:")
 
-    if len(ref) == 36:
+    if len(ref) == 36:  # noqa: PLR2004: 35 is length of normal formated uuid
         return uuid.UUID(ref)
-    elif len(ref) == 22:
+    if len(ref) == 22:  # noqa: PLR2004: 22 is length of base64 encoded uuid
         return uuid.UUID(bytes=base64.urlsafe_b64decode(ref + "=="))
-    else:
-        raise ValueError(f"Invalid UUID: {ref}")
+    msg = f"Invalid UUID: {ref}"
+    raise ValueError(msg)
 
 
-def print_tree(tree: Item, level=0):
-    print(
-        f"{"  "*level}{"*" if tree.hoisted else ""}{tree.name}{f" ({str(tree.uuid)[:8]})" if tree.uuid is not None else ""}"
-    )
+def display_uuid(uuid: uuid.UUID | None) -> str:
+    return f" ({str(uuid)[:8]})" if uuid is not None else ""
+
+
+def print_tree(tree: Item, level: int = 0) -> None:
+    print(f"{'  ' * level}{'*' if tree.hoisted else ''}{tree.name}{display_uuid(tree.uuid)}")
     for e in tree.children:
         print_tree(e, level + 1)
 
 
-def flatten(tree: Item, depth_first: bool = False) -> list[Item]:
+def flatten(tree: Item, *, depth_first: bool = False) -> list[Item]:
     q: deque[Item] = deque()
     q.append(tree)
     res = []
@@ -49,7 +50,7 @@ def flatten(tree: Item, depth_first: bool = False) -> list[Item]:
     return res
 
 
-def update_parents(i: Item):
+def update_parents(i: Item) -> None:
     for c in i.children:
         c.parent = i
         update_parents(c)

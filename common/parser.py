@@ -1,38 +1,39 @@
 from __future__ import annotations
 
-import uuid
-from xml.etree.ElementTree import Element
+from pathlib import Path
+from typing import TYPE_CHECKING, TextIO
+from xml.etree.ElementTree import Element  # noqa: S405 # xml.etree is unsafe, but this tool is only for personal use
 
 import markdown
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup, Tag
+from bs4.element import NavigableString
 from markdown import Extension
 from markdown.inlinepatterns import InlineProcessor
 
 from common.base import Item, flatten, parse_uuid, update_parents
 
+if TYPE_CHECKING:
+    import re
+    import uuid
+
 
 class HoistLinkInlineProcessor(InlineProcessor):
-    def handleMatch(self, m, data):
+    def handleMatch(self, m: re.Match[str], data: str) -> tuple[Element, int, int]:  # noqa: ARG002, N802, PLR6301
         el = Element("ref")
         el.text = m.group(1)
         return el, m.start(0), m.end(0)
 
 
 class HoistLinkLinkExtension(Extension):
-    def extendMarkdown(self, md):
-        HOIST_PATTERN = r"\[\[#(.+)\]\]"
-        md.inlinePatterns.register(
-            HoistLinkInlineProcessor(HOIST_PATTERN, md), "hoist", 175
-        )
+    def extendMarkdown(self, md: markdown.Markdown) -> None:  # noqa: N802, PLR6301
+        md.inlinePatterns.register(HoistLinkInlineProcessor(r"\[\[#(.+)\]\]", md), "hoist", 175)
 
 
-def parse_inventory_file(file: str) -> Item:
-    with open(file, "r", encoding="utf-8") as f:
+def parse_inventory_file(file: str | Path) -> Item:
+    with Path(file).open("r", encoding="utf-8") as f:
         inp = f.read()
     html = markdown.markdown(inp, extensions=[HoistLinkLinkExtension(), "nl2br"])
-    html = "".join(
-        line.strip() for line in html.split("\n")
-    )  # remove html formating whitespace for simpler soup
+    html = "".join(line.strip() for line in html.split("\n"))  # remove html formating whitespace for simpler soup
     doc = BeautifulSoup(html, "html.parser")
 
     hoists = {}
@@ -45,23 +46,18 @@ def parse_inventory_file(file: str) -> Item:
             case Tag(name="h1"):
                 cur_root = hoists[e.text]
             case _:
-                raise NotImplementedError(f"Unknown first level child: {type(e)}: {e}")
+                msg = f"Unknown first level child: {type(e)}: {e}"
+                raise NotImplementedError(msg)
     update_parents(root)
     return root
 
 
 def parse_list_item(li: Tag, hoists: dict[str, Item]) -> Item:
     strings: list[str] = [e for e in li.contents if isinstance(e, NavigableString)]
-    sublists: list[Tag] = [
-        e for e in li.contents if isinstance(e, Tag) and e.name == "ul"
-    ]
-    refs: list[str] = [
-        e.text for e in li.contents if isinstance(e, Tag) and e.name == "ref"
-    ]
+    sublists: list[Tag] = [e for e in li.contents if isinstance(e, Tag) and e.name == "ul"]
+    refs: list[str] = [e.text for e in li.contents if isinstance(e, Tag) and e.name == "ref"]
     uuids: list[uuid.UUID] = [
-        parse_uuid(e.attrs["href"])
-        for e in li.contents
-        if isinstance(e, Tag) and e.name == "a"
+        parse_uuid(str(e.attrs["href"])) for e in li.contents if isinstance(e, Tag) and e.name == "a"
     ]
 
     if len(refs) == 1:
@@ -70,15 +66,18 @@ def parse_list_item(li: Tag, hoists: dict[str, Item]) -> Item:
     elif len(strings) == 1:
         item = Item(strings[0].strip())
     else:
-        raise NotImplementedError(f"Unknown li: {type(li)}: {li}")
+        msg = f"Unknown li: {type(li)}: {li}"
+        raise NotImplementedError(msg)
 
     if len(sublists) > 1:
-        raise NotImplementedError(f"Too many sublists: {type(li)}: {li}")
+        msg = f"Too many sublists: {type(li)}: {li}"
+        raise NotImplementedError(msg)
     if sublists:
         item.children = parse_list(sublists[0], hoists)
 
     if len(uuids) > 1:
-        raise NotImplementedError(f"Too many uuids: {type(li)}: {li}")
+        msg = f"Too many uuids: {type(li)}: {li}"
+        raise NotImplementedError(msg)
     if uuids:
         item.uuid = uuids[0]
 
@@ -92,11 +91,12 @@ def parse_list(ul: Tag, hoists: dict[str, Item]) -> list[Item]:
             case Tag(name="li"):
                 children.append(parse_list_item(e, hoists))
             case _:
-                raise NotImplementedError(f"Unknown list child: {type(e)}: {e}")
+                msg = f"Unknown list child: {type(e)}: {e}"
+                raise NotImplementedError(msg)
     return children
 
 
-def render_item(f, i: Item, depth=0):
+def render_item(f: TextIO, i: Item, depth: int = 0) -> None:
     f.write("\t" * depth + "- ")
     if i.hoisted:
         f.write(f"[[#{i.name}]]")
@@ -110,8 +110,8 @@ def render_item(f, i: Item, depth=0):
             render_item(f, c, depth + 1)
 
 
-def save_inventory_file(file: str, root: Item):
-    with open(file, "w", encoding="utf-8") as f:
+def save_inventory_file(file: str | Path, root: Item) -> None:
+    with Path(file).open("w", encoding="utf-8") as f:
         for i in root.children:
             render_item(f, i)
         for h in (h for h in flatten(root) if h.hoisted):

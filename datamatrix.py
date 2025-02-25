@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 
 from PIL import Image, ImageDraw
-from ppf.datamatrix import DataMatrix
+from ppf.datamatrix import DataMatrix  # type: ignore
 
 PIXEL_SIZE = 40
 BORDER = 1
@@ -22,25 +22,18 @@ if __name__ == "__main__":
         w.writerow(["file", "uuid", "uuid_b64", "hash"])
         for _ in range(AMOUNT):
             uuid_obj = uuid.uuid4()
-            uuid_b64 = (
-                base64.urlsafe_b64encode(uuid_obj.bytes).decode().replace("=", "")
-            )
+            uuid_b64 = base64.urlsafe_b64encode(uuid_obj.bytes).decode().replace("=", "")
 
             dm = DataMatrix(uuid_b64)
 
             size = len(dm.matrix)
             img = Image.new("1", [(size + 2 * BORDER) * PIXEL_SIZE] * 2, 1)
 
-            def t(coord):
+            def t(coord: int) -> int:  # transform coordinates to image coordinates
                 return (BORDER + coord) * PIXEL_SIZE
 
             d = ImageDraw.Draw(img)
-            for x, y in (
-                (x, y)
-                for y, line in enumerate(dm.matrix)
-                for x, c in enumerate(line)
-                if c
-            ):
+            for x, y in ((x, y) for y, line in enumerate(dm.matrix) for x, c in enumerate(line) if c):
                 d.rectangle([t(x), t(y), t(x + 1) - 1, t(y + 1) - 1], fill=0)
 
             filename = f"{uuid_b64}.png"
