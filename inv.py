@@ -24,7 +24,7 @@ def search_item(s: str | uuid.UUID, tree: Item, *, uuid_only: bool = False) -> I
             raise ValueError(msg) from None
 
     uuid_candidates = [i for i in flatten(tree) if str(i.uuid).startswith(s.lower())]
-    if len(uuid_candidates) == 1:
+    if len(uuid_candidates) == 1 and len(s) > 3:  # noqa: PLR2004: require at least 3 chars to match to assume selection was intended:
         return uuid_candidates[0]
 
     name_candidates = [i for i in flatten(tree) if i.name.lower().startswith(s.lower())]
